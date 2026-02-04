@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Copy, Code, Eye, Edit, Languages } from 'lucide-react';
+import { Copy, Languages } from 'lucide-react';
 
 const RichTextEditor = () => {
   const [content, setContent] = useState('');
@@ -95,13 +95,6 @@ const RichTextEditor = () => {
 
   const convertToHtml = (text) => {
     if (!text.trim()) return '';
-
-    // Function to escape HTML special characters for text nodes
-    const escapeHtml = (str) => {
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    };
 
     // If text contains HTML tags, use DOMParser
     if (/<[a-z][\s\S]*>/i.test(text)) {
