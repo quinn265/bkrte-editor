@@ -12,7 +12,7 @@ const RichTextEditor = () => {
   // 语言配置
   const translations = {
     en: {
-      title: 'Rich Text Editor',
+      title: 'HTML Text Editor',
       subtitle: 'Auto-convert text to HTML paragraph format',
       editor: 'Editor',
       preview: 'Text View',
@@ -51,7 +51,7 @@ const RichTextEditor = () => {
       codeMode: 'Code Mode'
     },
     zh: {
-      title: '富文本编辑器',
+      title: '网页文本编辑器',
       subtitle: '自动转换文本为HTML段落格式',
       editor: '编辑器',
       preview: '文本视图',
