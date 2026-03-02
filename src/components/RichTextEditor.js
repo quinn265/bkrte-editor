@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Copy, Languages } from 'lucide-react';
 
 const RichTextEditor = () => {
@@ -122,7 +122,19 @@ const RichTextEditor = () => {
          root.childNodes.forEach(node => {
              if (node.nodeType === Node.TEXT_NODE) {
                  const txt = node.textContent.trim();
-                 if (txt) output += `<p>${txt}</p>\n`;
+                 if (txt) {
+                    // Check for markdown-style headers in text nodes
+                    if (/^#+\s/.test(txt)) {
+                        const content = txt.replace(/^#+\s+/, '');
+                        if (content.length <= 50) {
+                            output += `<h2>${content}</h2>\n`;
+                        } else {
+                            output += `<p>${txt}</p>\n`;
+                        }
+                    } else {
+                        output += `<p>${txt}</p>\n`;
+                    }
+                 }
              } else if (node.nodeType === Node.ELEMENT_NODE) {
                  const tag = node.tagName.toLowerCase();
                  // Recursively get content
@@ -144,7 +156,19 @@ const RichTextEditor = () => {
                  };
 
                  if (tag === 'p') {
-                     output += `<p>${getInlineContent(node)}</p>\n`;
+                     const inlineContent = getInlineContent(node);
+                     const txt = node.textContent.trim();
+                     if (/^#+\s/.test(txt)) {
+                         const content = txt.replace(/^#+\s+/, '');
+                         if (content.length <= 50) {
+                             const newInline = inlineContent.replace(/^#+\s+/, '');
+                             output += `<h2>${newInline}</h2>\n`;
+                         } else {
+                             output += `<p>${inlineContent}</p>\n`;
+                         }
+                     } else {
+                         output += `<p>${inlineContent}</p>\n`;
+                     }
                  } else if (/^h[1-6]$/.test(tag)) {
                      const inlineContent = getInlineContent(node);
                      const textContent = node.textContent.trim();
@@ -158,10 +182,21 @@ const RichTextEditor = () => {
                      // Recurse for blocks
                      output += processBody(node);
                  } else {
-                     // Treat as block if it has content? 
-                     // Or treat as inline wrapped in p?
                      const inline = getInlineContent(node);
-                     if (inline.trim()) output += `<p>${inline}</p>\n`;
+                     const txt = node.textContent.trim();
+                     if (inline.trim()) {
+                         if (/^#+\s/.test(txt)) {
+                             const content = txt.replace(/^#+\s+/, '');
+                             if (content.length <= 50) {
+                                 const newInline = inline.replace(/^#+\s+/, '');
+                                 output += `<h2>${newInline}</h2>\n`;
+                             } else {
+                                 output += `<p>${inline}</p>\n`;
+                             }
+                         } else {
+                             output += `<p>${inline}</p>\n`;
+                         }
+                     }
                  }
              }
          });
@@ -237,6 +272,17 @@ const RichTextEditor = () => {
   const handleContentChange = (e) => {
     setContent(e.target.value);
   };
+
+  // Sync content to contentEditable div without resetting cursor on every input
+  useEffect(() => {
+    if (contentEditableRef.current) {
+      // Only update if content is different (e.g. initial load, mode switch, or external update)
+      // This prevents cursor jumping when typing because innerHTML matches content
+      if (contentEditableRef.current.innerHTML !== content) {
+        contentEditableRef.current.innerHTML = content;
+      }
+    }
+  }, [content, editorMode]);
 
   const handleEditableInput = (e) => {
     const newContent = e.currentTarget.innerHTML;
@@ -336,7 +382,7 @@ const RichTextEditor = () => {
                 className={`w-full h-96 p-4 overflow-auto bg-white border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset text-gray-800 leading-relaxed ${!content ? 'empty-editor' : ''}`}
                 contentEditable={true}
                 onInput={handleEditableInput}
-                dangerouslySetInnerHTML={{ __html: content }}
+                suppressContentEditableWarning={true}
                 style={{ lineHeight: '1.6' }}
                 data-placeholder={t.placeholder}
               />
