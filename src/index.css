@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.preview-content h2 {
+  font-weight: 700;
+  font-size: 1.5em;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+.preview-content p {
+  margin-bottom: 1em;
+}
+
+.empty-editor::before {
+  content: attr(data-placeholder);
+  color: #9ca3af; /* text-gray-400 */
+  pointer-events: none;
+  white-space: pre-wrap;
+}

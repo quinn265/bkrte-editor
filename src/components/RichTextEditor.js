@@ -36,13 +36,13 @@ const RichTextEditor = () => {
       feature2: '• Automatic multi-paragraph recognition',
       feature3: '• Preview and code view support',
       feature4: '• One-click HTML code copying',
-      feature5: '• Auto-convert headers to bold',
+      feature5: '• Auto-convert headers to H2 tags',
       howToUse: 'How to Use',
       usage1: '• Enter text content in the editor area',
       usage2: '• Press Enter to separate paragraphs',
-      usage3: '• Use # or HTML h-tags for bold headings',
+      usage3: '• Use # or HTML h-tags for H2 headings',
       usage4: '• Click "Copy HTML" to get the code',
-      placeholder: 'Enter your text content here...\n\nEach paragraph will be automatically wrapped in HTML <p> tags.\n\nUse # for headings to make them bold.\n\nPress Enter to create new paragraphs.',
+      placeholder: 'Enter your text content here...\n\nEach paragraph will be automatically wrapped in HTML <p> tags.\n\nUse # for headings to make them H2 tags.\n\nPress Enter to create new paragraphs.',
       textModePlaceholder: 'Please enter or paste your text content in Code Mode',
       emptyPreview: 'Preview will appear here...',
       emptyCode: '<!-- Generated HTML will appear here -->',
@@ -68,20 +68,20 @@ const RichTextEditor = () => {
       characters: '字符数',
       paragraphCount: '段落数',
       htmlLength: 'HTML长度',
-      tip: '提示：每行文本被包裹在<p>中，#开头的行将自动加粗',
+      tip: '提示：每行文本被包裹在<p>中，#开头的行将自动转换为<h2>',
       usage: '使用说明',
       features: '功能特点',
       feature1: '• 实时文本转HTML段落转换',
       feature2: '• 自动多段落识别',
       feature3: '• 支持预览和代码视图',
       feature4: '• 一键复制HTML代码',
-      feature5: '• 自动识别小标题并加粗',
+      feature5: '• 自动识别小标题并转换为H2',
       howToUse: '如何使用',
       usage1: '• 在编辑区输入文本内容',
       usage2: '• 按回车键分隔段落',
-      usage3: '• 使用 # 或 H标签标记小标题',
+      usage3: '• 使用 # 或 H标签标记小标题(H2)',
       usage4: '• 点击"复制HTML"获取代码',
-      placeholder: '在此输入文本内容...\n\n每个段落将自动被包裹在HTML <p>标签中。\n\n使用 # 标记小标题（将自动转为加粗）。\n\n按回车键创建新段落。',
+      placeholder: '在此输入文本内容...\n\n每个段落将自动被包裹在HTML <p>标签中。\n\n使用 # 标记小标题（将自动转为H2）。\n\n按回车键创建新段落。',
       textModePlaceholder: '请在代码视图中输入或粘贴您要处理的文本内容',
       emptyPreview: '预览将在此处显示...',
       emptyCode: '<!-- 生成的HTML将在此处显示 -->',
@@ -146,7 +146,14 @@ const RichTextEditor = () => {
                  if (tag === 'p') {
                      output += `<p>${getInlineContent(node)}</p>\n`;
                  } else if (/^h[1-6]$/.test(tag)) {
-                     output += `<p><strong>${getInlineContent(node)}</strong></p>\n`;
+                     const inlineContent = getInlineContent(node);
+                     const textContent = node.textContent.trim();
+                     // If the header content is too long (likely a paragraph misused as header), convert to p
+                     if (textContent.length > 50) {
+                        output += `<p>${inlineContent}</p>\n`;
+                     } else {
+                        output += `<h2>${inlineContent}</h2>\n`;
+                     }
                  } else if (tag === 'div' || tag === 'section') {
                      // Recurse for blocks
                      output += processBody(node);
@@ -172,7 +179,11 @@ const RichTextEditor = () => {
       .map(line => {
         if (/^#+\s/.test(line)) {
           const content = line.replace(/^#+\s+/, '');
-          return `<p><strong>${content}</strong></p>`;
+          // If content is too long, treat as paragraph even if it starts with #
+          if (content.length > 50) {
+            return `<p><strong>${content}</strong></p>`; // Fallback to bold paragraph or just p? Let's use bold p to respect user intent but avoid h2 layout break
+          }
+          return `<h2>${content}</h2>`;
         }
         return `<p>${line}</p>`;
       })
@@ -322,11 +333,12 @@ const RichTextEditor = () => {
             ) : (
               <div 
                 ref={contentEditableRef}
-                className="w-full h-96 p-4 overflow-auto bg-white border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset text-gray-800 leading-relaxed"
+                className={`w-full h-96 p-4 overflow-auto bg-white border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset text-gray-800 leading-relaxed ${!content ? 'empty-editor' : ''}`}
                 contentEditable={true}
                 onInput={handleEditableInput}
                 dangerouslySetInnerHTML={{ __html: content }}
                 style={{ lineHeight: '1.6' }}
+                data-placeholder={t.placeholder}
               />
             )}
           </div>
@@ -364,7 +376,7 @@ const RichTextEditor = () => {
                 {htmlOutput ? (
                   <div 
                     dangerouslySetInnerHTML={{ __html: htmlOutput }}
-                    className="prose prose-gray max-w-none"
+                    className="prose prose-gray max-w-none preview-content"
                     style={{ lineHeight: '1.6' }}
                   />
                 ) : (
