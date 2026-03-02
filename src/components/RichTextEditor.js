@@ -117,89 +117,87 @@ const RichTextEditor = () => {
       // Headers -> <p><strong>
       // Inline -> strong or text
       
-      const processBody = (root) => {
-         let output = '';
-         root.childNodes.forEach(node => {
-             if (node.nodeType === Node.TEXT_NODE) {
-                 const txt = node.textContent.trim();
-                 if (txt) {
-                    // Check for markdown-style headers in text nodes
-                    if (/^#+\s/.test(txt)) {
-                        const content = txt.replace(/^#+\s+/, '');
-                        if (content.length <= 50) {
-                            output += `<h2>${content}</h2>\n`;
-                        } else {
-                            output += `<p>${txt}</p>\n`;
-                        }
-                    } else {
-                        output += `<p>${txt}</p>\n`;
-                    }
-                 }
-             } else if (node.nodeType === Node.ELEMENT_NODE) {
-                 const tag = node.tagName.toLowerCase();
-                 // Recursively get content
-                 // But wait, if we have <div><p>text</p></div>, we don't want <p><p>text</p></p>.
-                 
-                 // Helper to get inline content only
-                 const getInlineContent = (n) => {
-                    let s = '';
-                    n.childNodes.forEach(c => {
-                        if (c.nodeType === Node.TEXT_NODE) s += c.textContent;
-                        else if (c.nodeType === Node.ELEMENT_NODE) {
-                             const t = c.tagName.toLowerCase();
-                             if (t === 'strong' || t === 'b') s += `<strong>${getInlineContent(c)}</strong>`;
-                             else if (t === 'br') s += ''; 
-                             else s += getInlineContent(c);
-                        }
-                    });
-                    return s;
-                 };
-
-                 if (tag === 'p') {
-                     const inlineContent = getInlineContent(node);
-                     const txt = node.textContent.trim();
-                     if (/^#+\s/.test(txt)) {
-                         const content = txt.replace(/^#+\s+/, '');
-                         if (content.length <= 50) {
-                             const newInline = inlineContent.replace(/^#+\s+/, '');
-                             output += `<h2>${newInline}</h2>\n`;
-                         } else {
-                             output += `<p>${inlineContent}</p>\n`;
-                         }
-                     } else {
-                         output += `<p>${inlineContent}</p>\n`;
-                     }
-                 } else if (/^h[1-6]$/.test(tag)) {
-                     const inlineContent = getInlineContent(node);
-                     const textContent = node.textContent.trim();
-                     // If the header content is too long (likely a paragraph misused as header), convert to p
-                     if (textContent.length > 50) {
-                        output += `<p>${inlineContent}</p>\n`;
-                     } else {
-                        output += `<h2>${inlineContent}</h2>\n`;
-                     }
-                 } else if (tag === 'div' || tag === 'section') {
-                     // Recurse for blocks
-                     output += processBody(node);
-                 } else {
-                     const inline = getInlineContent(node);
-                     const txt = node.textContent.trim();
-                     if (inline.trim()) {
-                         if (/^#+\s/.test(txt)) {
-                             const content = txt.replace(/^#+\s+/, '');
-                             if (content.length <= 50) {
-                                 const newInline = inline.replace(/^#+\s+/, '');
-                                 output += `<h2>${newInline}</h2>\n`;
-                             } else {
-                                 output += `<p>${inline}</p>\n`;
-                             }
-                         } else {
-                             output += `<p>${inline}</p>\n`;
-                         }
-                     }
+      // Helper to get inline HTML content recursively
+      const getInlineHtml = (n) => {
+         let s = '';
+         n.childNodes.forEach(c => {
+             if (c.nodeType === Node.TEXT_NODE) {
+                 s += c.textContent;
+             } else if (c.nodeType === Node.ELEMENT_NODE) {
+                 const t = c.tagName.toLowerCase();
+                 if (t === 'br') s += '<br>';
+                 else {
+                    const inner = getInlineHtml(c);
+                    if (t === 'strong' || t === 'b') s += `<strong>${inner}</strong>`;
+                    else if (t === 'em' || t === 'i') s += `<em>${inner}</em>`;
+                    else if (t === 'span') s += inner; 
+                    else s += inner; 
                  }
              }
          });
+         return s;
+      };
+
+      const processBody = (root) => {
+         let output = '';
+         let accumulator = '';
+
+         const flush = (allowEmpty = false) => {
+             if (!accumulator.trim()) {
+                 accumulator = '';
+                 return;
+             }
+             const text = accumulator.replace(/<[^>]+>/g, '').trim();
+             // H2 detection
+             if (/^#+\s/.test(text) && text.length <= 50) {
+                 let content = accumulator.replace(/^(\s*<[^>]+>)*\s*#+\s+/, '$1');
+                 output += `<h2>${content}</h2>\n`;
+             } else {
+                 output += `<p>${accumulator}</p>\n`;
+             }
+             accumulator = '';
+         };
+
+         root.childNodes.forEach(node => {
+             if (node.nodeType === Node.TEXT_NODE) {
+                 const parts = node.textContent.split('\n');
+                 parts.forEach((part, i) => {
+                     if (i > 0) flush(true); 
+                     accumulator += part;
+                 });
+             } else if (node.nodeType === Node.ELEMENT_NODE) {
+                 const tag = node.tagName.toLowerCase();
+                 
+                 if (tag === 'br') {
+                     flush(true);
+                 } else if (/^(div|p|h[1-6]|section|article|li|ul|ol|blockquote)$/.test(tag)) {
+                     flush(false);
+                     if (tag === 'div' || tag === 'section' || tag === 'article' || tag === 'blockquote' || tag === 'ul' || tag === 'ol') {
+                         output += processBody(node);
+                     } else {
+                         const inner = getInlineHtml(node);
+                         const text = node.textContent.trim();
+                         if (/^h[1-6]$/.test(tag)) {
+                             if (text.length > 50) {
+                                 output += `<p>${inner}</p>\n`;
+                             } else {
+                                 output += `<h2>${inner}</h2>\n`;
+                             }
+                         } else {
+                             if (/^#+\s/.test(text) && text.length <= 50) {
+                                 const content = inner.replace(/^(\s*<[^>]+>)*\s*#+\s+/, '$1');
+                                 output += `<h2>${content}</h2>\n`;
+                             } else {
+                                 output += `<p>${inner}</p>\n`;
+                             }
+                         }
+                     }
+                 } else {
+                     accumulator += getInlineHtml(node);
+                 }
+             }
+         });
+         flush(false);
          return output;
       };
       
