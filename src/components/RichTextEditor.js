@@ -138,12 +138,24 @@ const RichTextEditor = () => {
          return s;
       };
 
+      // Helper to check if content is effectively empty (only whitespace, br, or nbsp)
+      const isContentEmpty = (html) => {
+          if (!html) return true;
+          // Remove all HTML tags and non-breaking spaces
+          // If only whitespace remains, it's considered empty
+          const clean = html
+              .replace(/<[^>]+>/g, '') // Remove all tags
+              .replace(/&nbsp;/gi, '')
+              .trim();
+          return clean.length === 0;
+      };
+
       const processBody = (root) => {
          let output = '';
          let accumulator = '';
 
-         const flush = (allowEmpty = false) => {
-             if (!accumulator.trim()) {
+         const flush = () => {
+             if (isContentEmpty(accumulator)) {
                  accumulator = '';
                  return;
              }
@@ -162,33 +174,35 @@ const RichTextEditor = () => {
              if (node.nodeType === Node.TEXT_NODE) {
                  const parts = node.textContent.split('\n');
                  parts.forEach((part, i) => {
-                     if (i > 0) flush(true); 
+                     if (i > 0) flush(); 
                      accumulator += part;
                  });
              } else if (node.nodeType === Node.ELEMENT_NODE) {
                  const tag = node.tagName.toLowerCase();
                  
                  if (tag === 'br') {
-                     flush(true);
+                     flush();
                  } else if (/^(div|p|h[1-6]|section|article|li|ul|ol|blockquote)$/.test(tag)) {
-                     flush(false);
+                     flush();
                      if (tag === 'div' || tag === 'section' || tag === 'article' || tag === 'blockquote' || tag === 'ul' || tag === 'ol') {
                          output += processBody(node);
                      } else {
                          const inner = getInlineHtml(node);
-                         const text = node.textContent.trim();
-                         if (/^h[1-6]$/.test(tag)) {
-                             if (text.length > 50) {
-                                 output += `<p>${inner}</p>\n`;
+                         if (!isContentEmpty(inner)) {
+                             const text = node.textContent.trim();
+                             if (/^h[1-6]$/.test(tag)) {
+                                 if (text.length > 50) {
+                                     output += `<p>${inner}</p>\n`;
+                                 } else {
+                                     output += `<h2>${inner}</h2>\n`;
+                                 }
                              } else {
-                                 output += `<h2>${inner}</h2>\n`;
-                             }
-                         } else {
-                             if (/^#+\s/.test(text) && text.length <= 50) {
-                                 const content = inner.replace(/^(\s*<[^>]+>)*\s*#+\s+/, '$1');
-                                 output += `<h2>${content}</h2>\n`;
-                             } else {
-                                 output += `<p>${inner}</p>\n`;
+                                 if (/^#+\s/.test(text) && text.length <= 50) {
+                                     const content = inner.replace(/^(\s*<[^>]+>)*\s*#+\s+/, '$1');
+                                     output += `<h2>${content}</h2>\n`;
+                                 } else {
+                                     output += `<p>${inner}</p>\n`;
+                                 }
                              }
                          }
                      }
@@ -197,7 +211,7 @@ const RichTextEditor = () => {
                  }
              }
          });
-         flush(false);
+         flush();
          return output;
       };
       
